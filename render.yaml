@@ -7,19 +7,16 @@
 #   - worker (RQ consumer) — processes scrape/metrics jobs
 #   - scheduler (rq-scheduler) — registers cron-style recurring jobs
 #
-# One-time setup after `New -> Blueprint`:
+# Setup after `New -> Blueprint`:
 #   1. Point Render at this repo and branch.
-#   2. In the dashboard, open the `vkstat` env var group and set VK_TOKENS
-#      (service token from VK « Налаштування API»; comma-separated for a pool).
+#   2. In the `vkstat` env var group set VK_TOKENS (service token from VK
+#      « Налаштування API»; comma-separated for a pool).
 #   3. Deploy.
 #
-# Notes on plan choice:
-#   - Free web services sleep after 15 min of inactivity; Key Value and Postgres
-#     free tiers have storage/age caps. Background workers require a paid plan
-#     (Starter+). To try it end-to-end for free, disable the scheduler/worker
-#     and run `make scrape` manually — search still works against whatever has
-#     been imported.
-#   - For always-on + auto-scrape, bump web/worker/scheduler to `starter` ($7/mo each).
+# Plan notes:
+#   - web + Postgres + Key Value run on free. Free web sleeps after 15 min of
+#     inactivity; free Postgres expires after ~90 days.
+#   - Render background workers require Starter+ ($7/mo each).
 
 databases:
   - name: vkstat-postgres
@@ -32,7 +29,7 @@ services:
   - type: keyvalue
     name: vkstat-redis
     plan: free
-    ipAllowList: []            # only Render services on the same account can connect
+    ipAllowList: []
 
   - type: web
     name: vkstat-api
@@ -40,37 +37,10 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     autoDeploy: true
-    # Migrations run as part of the startup command so the first request never
-    # hits an un-migrated DB. Idempotent — alembic is a no-op when up to date.
+    # Migrations run as part of startup so the first request never hits an
+    # un-migrated DB. Idempotent — alembic is a no-op when up to date.
     dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     healthCheckPath: /healthz
-    envVars:
-      - fromGroup: vkstat
-      - key: PYTHONUNBUFFERED
-        value: "1"
-
-  - type: worker
-    name: vkstat-worker
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter             # workers require a paid plan on Render
-    autoDeploy: true
-    dockerCommand: python -m app.workers.worker
-    envVars:
-      - fromGroup: vkstat
-
-  - type: worker
-    name: vkstat-scheduler
-    runtime: docker
-    dockerfilePath: ./Dockerfile
-    plan: starter
-    autoDeploy: true
-    dockerCommand: python -m app.workers.scheduler
-    envVars:
-      - fromGroup: vkstat
-
-envVarGroups:
-  - name: vkstat
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -81,7 +51,54 @@ envVarGroups:
           type: keyvalue
           name: vkstat-redis
           property: connectionString
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - fromGroup: vkstat
+
+  - type: worker
+    name: vkstat-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    autoDeploy: true
+    dockerCommand: python -m app.workers.worker
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vkstat-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: vkstat-redis
+          property: connectionString
+      - fromGroup: vkstat
+
+  - type: worker
+    name: vkstat-scheduler
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    autoDeploy: true
+    dockerCommand: python -m app.workers.scheduler
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vkstat-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: vkstat-redis
+          property: connectionString
+      - fromGroup: vkstat
+
+# envVarGroups only accept plain key/value entries (no fromDatabase/fromService).
+# Cross-service references live inside each service's envVars above.
+envVarGroups:
+  - name: vkstat
+    envVars:
       - key: VK_TOKENS
-        sync: false            # set by hand in the dashboard
+        sync: false
       - key: VK_API_VERSION
         value: "5.199"
