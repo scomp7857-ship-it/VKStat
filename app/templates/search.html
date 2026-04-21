@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Пошук — VKStat{% endblock %}
+{% block content %}
+<section class="card">
+  <form method="get" action="/search" class="search-form">
+    <input type="search" name="q" value="{{ q }}" placeholder='слово / "точна фраза" / ~підрядок~' autofocus>
+    <select name="order">
+      {% for opt, label in [("relevance","релевантність"),("date","дата"),("views","перегляди"),("likes","лайки")] %}
+        <option value="{{ opt }}" {% if order == opt %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <input type="date" name="date_from" value="{{ date_from }}">
+    <input type="date" name="date_to" value="{{ date_to }}">
+    <select name="group_id" multiple size="1">
+      {% for g in groups %}
+        <option value="{{ g.id }}" {% if g.id in group_id %}selected{% endif %}>
+          {{ g.name or g.screen_name or ("club" ~ g.vk_id) }}
+        </option>
+      {% endfor %}
+    </select>
+    <button type="submit">Знайти</button>
+    {% if q %}<a class="btn-link" href="/export.csv?q={{ q|urlencode }}&order={{ order }}">CSV</a>{% endif %}
+  </form>
+</section>
+
+{% if q %}
+<section class="card summary">
+  <div class="kpi"><span class="kpi-val">{{ summary.mentions }}</span><span class="kpi-lbl">згадувань</span></div>
+  <div class="kpi"><span class="kpi-val">{{ summary.reach }}</span><span class="kpi-lbl">охоплення</span></div>
+  <div class="kpi"><span class="kpi-val">{{ summary.likes }}</span><span class="kpi-lbl">лайків</span></div>
+  <div class="kpi"><span class="kpi-val">{{ summary.groups }}</span><span class="kpi-lbl">груп</span></div>
+</section>
+
+<section class="card">
+  <h3>Динаміка за 30 днів</h3>
+  <canvas id="chart-mentions" height="90"></canvas>
+  <script id="ts-data" type="application/json">{{ timeseries|tojson }}</script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const data = JSON.parse(document.getElementById("ts-data").textContent);
+      new Chart(document.getElementById("chart-mentions"), {
+        type: "bar",
+        data: {
+          labels: data.map(d => d.day),
+          datasets: [
+            { label: "згадувань", data: data.map(d => d.mentions), yAxisID: "y" },
+            { label: "охоплення", data: data.map(d => d.reach), type: "line", yAxisID: "y1" },
+          ],
+        },
+        options: {
+          scales: {
+            y: { position: "left", beginAtZero: true },
+            y1: { position: "right", beginAtZero: true, grid: { drawOnChartArea: false } },
+          },
+        },
+      });
+    });
+  </script>
+</section>
+
+<section class="card two-col">
+  <div>
+    <h3>Топ постів за переглядами</h3>
+    <ol class="top-list">
+      {% for p in top %}
+      <li>
+        <a href="{{ p.url }}" target="_blank">{{ p.group_name or p.group_screen }}</a>
+        <span class="muted">· {{ p.date.strftime("%Y-%m-%d") }} · {{ p.views }} переглядів · {{ p.likes }} ❤</span>
+        <div class="snippet">{{ p.text[:240] }}{% if p.text|length > 240 %}…{% endif %}</div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  <div>
+    <h3>Хмара супутніх слів</h3>
+    <div class="cloud">
+      {% for w in cloud %}
+        <span class="cloud-word" style="font-size: {{ 0.8 + (w.count / (cloud[0].count or 1)) * 1.6 }}rem">
+          {{ w.word }}<sub>{{ w.count }}</sub>
+        </span>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h3>Результати ({{ results.total }})</h3>
+  <ul class="results">
+    {% for r in results.items %}
+    <li>
+      <div>
+        <a href="{{ r.url }}" target="_blank">{{ r.group_name or r.group_screen }}</a>
+        <span class="muted">· {{ r.date.strftime("%Y-%m-%d %H:%M") }}
+          · 👁 {{ r.views }} · ❤ {{ r.likes }} · ↻ {{ r.reposts }} · 💬 {{ r.comments }}</span>
+      </div>
+      <div class="snippet">{{ r.headline|safe }}</div>
+    </li>
+    {% else %}
+    <li class="muted">Нічого не знайдено.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% endblock %}

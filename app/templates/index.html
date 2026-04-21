@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}VKStat — групи{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Імпорт груп</h1>
+  <p class="muted">Встав посилання або screen_name (по одному на рядок, або через кому/пробіл).</p>
+  <form hx-post="/groups/import" hx-target="#import-result" hx-swap="innerHTML">
+    <textarea name="urls" rows="8" placeholder="https://vk.com/durov&#10;club1&#10;team"></textarea>
+    <button type="submit">Імпортувати</button>
+  </form>
+  <div id="import-result"></div>
+</section>
+
+<section class="card">
+  <h2>Збережені групи ({{ total_groups }})</h2>
+  <table class="groups">
+    <thead><tr><th>Назва</th><th>Screen</th><th>VK ID</th><th>Учасники</th><th>Останній скрейп</th></tr></thead>
+    <tbody>
+      {% for g in groups %}
+      <tr>
+        <td><a href="{{ g.url }}" target="_blank">{{ g.name or g.screen_name or ("club" ~ g.vk_id) }}</a></td>
+        <td>{{ g.screen_name or "" }}</td>
+        <td>{{ g.vk_id }}</td>
+        <td>{{ g.members_count or "—" }}</td>
+        <td>{{ g.last_scraped_at.strftime("%Y-%m-%d %H:%M") if g.last_scraped_at else "ніколи" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">Поки немає груп — імпортуй вище.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

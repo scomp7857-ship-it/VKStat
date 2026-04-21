@@ -1,0 +1,71 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-vkstat}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vkstat}
+      POSTGRES_DB: ${POSTGRES_DB:-vkstat}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vkstat}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    environment: &app-env
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-vkstat}:${POSTGRES_PASSWORD:-vkstat}@postgres:5432/${POSTGRES_DB:-vkstat}
+      REDIS_URL: redis://redis:6379/0
+      VK_TOKENS: ${VK_TOKENS}
+      VK_API_VERSION: ${VK_API_VERSION:-5.199}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./:/app
+
+  worker:
+    build: .
+    command: python -m app.workers.worker
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+
+  scheduler:
+    build: .
+    command: python -m app.workers.scheduler
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+
+volumes:
+  pgdata:
