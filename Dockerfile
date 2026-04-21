@@ -17,3 +17,7 @@ RUN pip install -r requirements.txt
 COPY . .
 
 EXPOSE 8000
+
+# Default command suits the web service: run migrations, then serve.
+# Worker / scheduler containers override this via docker-compose / render.yaml.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
