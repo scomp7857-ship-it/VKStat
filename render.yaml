@@ -1,0 +1,87 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+#
+# Deploys VKStat as:
+#   - managed Postgres (with unaccent + pg_trgm extensions — added at migration time)
+#   - managed Key Value (Redis-compatible) for the RQ queue
+#   - web service (FastAPI) — runs `alembic upgrade head` then uvicorn
+#   - worker (RQ consumer) — processes scrape/metrics jobs
+#   - scheduler (rq-scheduler) — registers cron-style recurring jobs
+#
+# One-time setup after `New -> Blueprint`:
+#   1. Point Render at this repo and branch.
+#   2. In the dashboard, open the `vkstat` env var group and set VK_TOKENS
+#      (service token from VK « Налаштування API»; comma-separated for a pool).
+#   3. Deploy.
+#
+# Notes on plan choice:
+#   - Free web services sleep after 15 min of inactivity; Key Value and Postgres
+#     free tiers have storage/age caps. Background workers require a paid plan
+#     (Starter+). To try it end-to-end for free, disable the scheduler/worker
+#     and run `make scrape` manually — search still works against whatever has
+#     been imported.
+#   - For always-on + auto-scrape, bump web/worker/scheduler to `starter` ($7/mo each).
+
+databases:
+  - name: vkstat-postgres
+    databaseName: vkstat
+    user: vkstat
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: keyvalue
+    name: vkstat-redis
+    plan: free
+    ipAllowList: []            # only Render services on the same account can connect
+
+  - type: web
+    name: vkstat-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeploy: true
+    # Migrations run as part of the startup command so the first request never
+    # hits an un-migrated DB. Idempotent — alembic is a no-op when up to date.
+    dockerCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /healthz
+    envVars:
+      - fromGroup: vkstat
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+  - type: worker
+    name: vkstat-worker
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter             # workers require a paid plan on Render
+    autoDeploy: true
+    dockerCommand: python -m app.workers.worker
+    envVars:
+      - fromGroup: vkstat
+
+  - type: worker
+    name: vkstat-scheduler
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter
+    autoDeploy: true
+    dockerCommand: python -m app.workers.scheduler
+    envVars:
+      - fromGroup: vkstat
+
+envVarGroups:
+  - name: vkstat
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vkstat-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: vkstat-redis
+          property: connectionString
+      - key: VK_TOKENS
+        sync: false            # set by hand in the dashboard
+      - key: VK_API_VERSION
+        value: "5.199"

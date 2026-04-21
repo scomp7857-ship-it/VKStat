@@ -97,6 +97,29 @@ JSON-ендпоінти:
 
 Масштабування: `docker compose up -d --scale worker=4`.
 
+## Деплой на Render
+
+Репо вже містить `render.yaml` (Blueprint), який описує 5 ресурсів: Postgres,
+Key Value (Redis), web (FastAPI), worker (RQ), scheduler (rq-scheduler).
+
+1. У Render натисни **New → Blueprint**, обери цей репозиторій і гілку.
+2. Render прочитає `render.yaml` і запропонує створити всі ресурси.
+3. У дашборді відкрий env-group **`vkstat`** і встав `VK_TOKENS=token1,token2`
+   (service token VK → «Налаштування API»; кілька через кому для пулу).
+4. Deploy.
+
+Міграції запускаються автоматично під час старту web-контейнера
+(`alembic upgrade head && uvicorn …`), тому перший запит ніколи не впаде на
+непроміграну БД. `unaccent` і `pg_trgm` ставить сама міграція.
+
+**Тарифи**: web + Postgres + Key Value запускаються на `free`. Workers на Render
+потребують мінімум `starter` ($7/міс кожен). Якщо хочеш повністю безкоштовний
+варіант — прибери `vkstat-worker` і `vkstat-scheduler` з `render.yaml` і
+запускай скрейп руками через `render shell` → `python -m app.cli enqueue-scrape`
+(або напряму `python -m app.jobs` в одноразовому Job).
+
+Health-check: `GET /healthz`.
+
 ## Структура коду
 
 ```
