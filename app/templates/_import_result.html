@@ -1,14 +1,17 @@
 <div class="import-result">
-  <p>
-    Запит: <b>{{ result.requested }}</b>,
-    розпізнано: <b>{{ result.resolved }}</b>,
-    додано: <b>{{ result.inserted }}</b>,
+  <p style="margin:0;">
+    Запит: <b>{{ result.requested }}</b> ·
+    розпізнано: <b>{{ result.resolved }}</b> ·
+    додано: <b>{{ result.inserted }}</b> ·
     оновлено: <b>{{ result.updated }}</b>.
-    Першу проходку по стіні поставлено у чергу.
+    <em>Першу проходку по стіні поставлено у чергу.</em>
   </p>
   {% if result.failed %}
-    <details><summary>Не вдалося розпізнати ({{ result.failed|length }})</summary>
-      <ul>{% for f in result.failed %}<li>{{ f }}</li>{% endfor %}</ul>
+    <details>
+      <summary>Не вдалося розпізнати ({{ result.failed|length }})</summary>
+      <ul style="margin:0.5rem 0 0;padding-left:1.2rem;">
+        {% for f in result.failed %}<li>{{ f }}</li>{% endfor %}
+      </ul>
     </details>
   {% endif %}
 </div>

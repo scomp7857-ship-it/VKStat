@@ -1,33 +1,104 @@
 {% extends "base.html" %}
 {% block title %}VKStat — групи{% endblock %}
 {% block content %}
-<section class="card">
-  <h1>Імпорт груп</h1>
-  <p class="muted">Встав посилання або screen_name (по одному на рядок, або через кому/пробіл).</p>
-  <form hx-post="/groups/import" hx-target="#import-result" hx-swap="innerHTML">
-    <textarea name="urls" rows="8" placeholder="https://vk.com/durov&#10;club1&#10;team"></textarea>
-    <button type="submit">Імпортувати</button>
-  </form>
-  <div id="import-result"></div>
+
+<section class="hero">
+  <div class="eyebrow">Index № 01 · Публічна аналітика VK</div>
+  <h1>
+    <span class="line"><span>Читаємо цифровий</span></span>
+    <span class="line"><span><em>шепіт</em> спільнот</span></span>
+    <span class="line"><span>та перетворюємо на сенс.</span></span>
+  </h1>
+
+  <div class="meta">
+    <div>
+      <span class="k">Groups tracked</span>
+      <span class="v">{{ "%03d"|format(total_groups) }}</span>
+    </div>
+    <div>
+      <span class="k">Ingestion</span>
+      <span class="v">Live<em> / queue</em></span>
+    </div>
+    <div>
+      <span class="k">Stack</span>
+      <span class="v">FastAPI<em> × HTMX</em></span>
+    </div>
+    <div>
+      <span class="k">Method</span>
+      <span class="v"><em>Signal over noise</em></span>
+    </div>
+  </div>
 </section>
 
-<section class="card">
-  <h2>Збережені групи ({{ total_groups }})</h2>
+<div class="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <span>import</span><span>resolve</span><span>scrape</span><span>index</span><span>rank</span><span>export</span>
+    <span>import</span><span>resolve</span><span>scrape</span><span>index</span><span>rank</span><span>export</span>
+  </div>
+</div>
+
+<section class="section reveal">
+  <div class="section-head">
+    <h2>Імпорт <em>груп</em></h2>
+    <span class="num">[02 / ingest]</span>
+  </div>
+
+  <div class="card">
+    <p class="muted" style="max-width:60ch;margin-top:0;">
+      Встав посилання або <code style="font-family:var(--font-mono);color:var(--ink);">screen_name</code> — по одному на рядок, або через кому чи пробіл. Перший прохід по стіні стартує автоматично.
+    </p>
+    <form hx-post="/groups/import" hx-target="#import-result" hx-swap="innerHTML" style="margin-top:1.25rem;">
+      <label for="urls-input">Джерела</label>
+      <textarea id="urls-input" name="urls" rows="8" placeholder="https://vk.com/durov&#10;club1&#10;team"></textarea>
+      <div style="margin-top:1.25rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:center;">
+        <button type="submit">Імпортувати</button>
+        <span class="faint">Queued scrape · job_timeout 3600s</span>
+      </div>
+    </form>
+    <div id="import-result"></div>
+  </div>
+</section>
+
+<section class="section reveal">
+  <div class="section-head">
+    <h2>Збережені <em>групи</em></h2>
+    <span class="num">[03 / archive · {{ total_groups }}]</span>
+  </div>
+
   <table class="groups">
-    <thead><tr><th>Назва</th><th>Screen</th><th>VK ID</th><th>Учасники</th><th>Останній скрейп</th></tr></thead>
+    <thead>
+      <tr>
+        <th style="width:36%">Назва</th>
+        <th>Screen</th>
+        <th>VK ID</th>
+        <th>Учасники</th>
+        <th>Останній скрейп</th>
+      </tr>
+    </thead>
     <tbody>
       {% for g in groups %}
       <tr>
-        <td><a href="{{ g.url }}" target="_blank">{{ g.name or g.screen_name or ("club" ~ g.vk_id) }}</a></td>
-        <td>{{ g.screen_name or "" }}</td>
-        <td>{{ g.vk_id }}</td>
-        <td>{{ g.members_count or "—" }}</td>
-        <td>{{ g.last_scraped_at.strftime("%Y-%m-%d %H:%M") if g.last_scraped_at else "ніколи" }}</td>
+        <td>
+          <a href="{{ g.url }}" target="_blank" rel="noopener">
+            {{ g.name or g.screen_name or ("club" ~ g.vk_id) }}
+          </a>
+        </td>
+        <td class="muted">{{ g.screen_name or "—" }}</td>
+        <td class="muted" style="font-family:var(--font-mono);font-size:0.85rem;">{{ g.vk_id }}</td>
+        <td>{{ "{:,}".format(g.members_count).replace(",", " ") if g.members_count else "—" }}</td>
+        <td class="muted" style="font-family:var(--font-mono);font-size:0.82rem;">
+          {{ g.last_scraped_at.strftime("%Y-%m-%d %H:%M") if g.last_scraped_at else "ніколи" }}
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="5" class="muted">Поки немає груп — імпортуй вище.</td></tr>
+      <tr>
+        <td colspan="5" class="muted" style="padding:2.5rem 0.8rem;text-align:center;">
+          <em style="font-size:1.4rem;">Поки порожньо.</em> Імпортуй першу групу вище — й архів оживе.
+        </td>
+      </tr>
       {% endfor %}
     </tbody>
   </table>
 </section>
+
 {% endblock %}

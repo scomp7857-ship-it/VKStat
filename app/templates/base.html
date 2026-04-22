@@ -3,19 +3,101 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}VKStat{% endblock %}</title>
+  <title>{% block title %}VKStat — editorial analytics for VK{% endblock %}</title>
+  <meta name="theme-color" content="#0b0b0c">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="/static/app.css">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js" defer></script>
 </head>
 <body>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="cursor-ring" aria-hidden="true"></div>
+  <div class="cursor-dot" aria-hidden="true"></div>
+
   <header class="topbar">
-    <a class="brand" href="/">VKStat</a>
+    <a class="brand" href="/">VKStat<span class="italic" style="font-size:0.9rem;color:var(--ink-dim);">/studio</span></a>
     <nav>
       <a href="/">Групи</a>
       <a href="/search">Пошук</a>
+      <a href="/api/search?q=" target="_blank" rel="noopener">API</a>
     </nav>
+    <span class="topbar-clock" id="clock">—</span>
   </header>
+
   <main>{% block content %}{% endblock %}</main>
+
+  <footer class="footer">
+    <div class="big">Signals, decoded.</div>
+    <div>© {{ "2026" }} VKStat Studio</div>
+    <div>Built with FastAPI · HTMX · Chart.js</div>
+    <div>Kyiv / Remote</div>
+  </footer>
+
+  <script>
+    // --- Clock in header (Kyiv time display) ---
+    (function () {
+      const el = document.getElementById("clock");
+      if (!el) return;
+      const tick = () => {
+        const d = new Date();
+        const hh = String(d.getHours()).padStart(2, "0");
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const ss = String(d.getSeconds()).padStart(2, "0");
+        el.textContent = `KYIV · ${hh}:${mm}:${ss}`;
+      };
+      tick();
+      setInterval(tick, 1000);
+    })();
+
+    // --- Custom cursor ---
+    (function () {
+      if (matchMedia("(pointer: coarse)").matches) return;
+      const dot = document.querySelector(".cursor-dot");
+      const ring = document.querySelector(".cursor-ring");
+      if (!dot || !ring) return;
+
+      let mx = window.innerWidth / 2, my = window.innerHeight / 2;
+      let rx = mx, ry = my;
+
+      window.addEventListener("mousemove", (e) => {
+        mx = e.clientX;
+        my = e.clientY;
+        dot.style.transform = `translate(${mx}px, ${my}px) translate(-50%, -50%)`;
+      });
+
+      const loop = () => {
+        rx += (mx - rx) * 0.18;
+        ry += (my - ry) * 0.18;
+        ring.style.transform = `translate(${rx}px, ${ry}px) translate(-50%, -50%)`;
+        requestAnimationFrame(loop);
+      };
+      loop();
+
+      const hoverSelectors = "a, button, .btn, .btn-link, input, textarea, select, summary, label, .cloud-word";
+      document.addEventListener("mouseover", (e) => {
+        if (e.target.closest(hoverSelectors)) document.body.classList.add("cursor-hover");
+      });
+      document.addEventListener("mouseout", (e) => {
+        if (e.target.closest(hoverSelectors)) document.body.classList.remove("cursor-hover");
+      });
+    })();
+
+    // --- Reveal on scroll ---
+    (function () {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          if (en.isIntersecting) {
+            en.target.classList.add("in");
+            io.unobserve(en.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+    })();
+  </script>
 </body>
 </html>

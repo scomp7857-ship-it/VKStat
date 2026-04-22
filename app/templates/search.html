@@ -1,17 +1,24 @@
 {% extends "base.html" %}
 {% block title %}Пошук — VKStat{% endblock %}
 {% block content %}
-<section class="card">
-  <form method="get" action="/search" class="search-form">
-    <input type="search" name="q" value="{{ q }}" placeholder='слово / "точна фраза" / ~підрядок~' autofocus>
-    <select name="order">
+
+<section class="hero">
+  <div class="eyebrow">Index № 02 · Query the archive</div>
+  <h1>
+    <span class="line"><span>Що саме</span></span>
+    <span class="line"><span><em>резонує</em> сьогодні?</span></span>
+  </h1>
+
+  <form method="get" action="/search" class="search-form" style="margin-top:2.5rem;">
+    <input type="search" name="q" value="{{ q }}" placeholder='слово · "точна фраза" · ~підрядок~' autofocus>
+    <select name="order" aria-label="Порядок">
       {% for opt, label in [("relevance","релевантність"),("date","дата"),("views","перегляди"),("likes","лайки")] %}
         <option value="{{ opt }}" {% if order == opt %}selected{% endif %}>{{ label }}</option>
       {% endfor %}
     </select>
-    <input type="date" name="date_from" value="{{ date_from }}">
-    <input type="date" name="date_to" value="{{ date_to }}">
-    <select name="group_id" multiple size="1">
+    <input type="date" name="date_from" value="{{ date_from }}" aria-label="Дата з">
+    <input type="date" name="date_to" value="{{ date_to }}" aria-label="Дата до">
+    <select name="group_id" multiple size="1" aria-label="Групи">
       {% for g in groups %}
         <option value="{{ g.id }}" {% if g.id in group_id %}selected{% endif %}>
           {{ g.name or g.screen_name or ("club" ~ g.vk_id) }}
@@ -24,33 +31,104 @@
 </section>
 
 {% if q %}
-<section class="card summary">
-  <div class="kpi"><span class="kpi-val">{{ summary.mentions }}</span><span class="kpi-lbl">згадувань</span></div>
-  <div class="kpi"><span class="kpi-val">{{ summary.reach }}</span><span class="kpi-lbl">охоплення</span></div>
-  <div class="kpi"><span class="kpi-val">{{ summary.likes }}</span><span class="kpi-lbl">лайків</span></div>
-  <div class="kpi"><span class="kpi-val">{{ summary.groups }}</span><span class="kpi-lbl">груп</span></div>
+<section class="section reveal" style="padding-top:3rem;">
+  <div class="section-head">
+    <h2>Показники за запитом <em>«{{ q }}»</em></h2>
+    <span class="num">[01 / summary]</span>
+  </div>
+
+  <div class="summary">
+    <div class="kpi">
+      <span class="kpi-val">{{ summary.mentions }}</span>
+      <span class="kpi-lbl">Згадувань</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-val">{{ summary.reach }}</span>
+      <span class="kpi-lbl">Охоплення</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-val">{{ summary.likes }}</span>
+      <span class="kpi-lbl">Лайків</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-val">{{ summary.groups }}</span>
+      <span class="kpi-lbl">Груп</span>
+    </div>
+  </div>
 </section>
 
-<section class="card">
-  <h3>Динаміка за 30 днів</h3>
-  <canvas id="chart-mentions" height="90"></canvas>
+<section class="section reveal">
+  <div class="section-head">
+    <h3>Динаміка за <em>30 днів</em></h3>
+    <span class="num">[02 / timeseries]</span>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="chart-mentions" height="90"></canvas>
+  </div>
   <script id="ts-data" type="application/json">{{ timeseries|tojson }}</script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const data = JSON.parse(document.getElementById("ts-data").textContent);
+      const root = getComputedStyle(document.documentElement);
+      const ink = root.getPropertyValue("--ink").trim() || "#f2ede3";
+      const inkDim = root.getPropertyValue("--ink-faint").trim() || "#6b6860";
+      const accent = root.getPropertyValue("--accent").trim() || "#d8ff3c";
+      const line = "rgba(242, 237, 227, 0.08)";
+
+      Chart.defaults.color = inkDim;
+      Chart.defaults.font.family = "Inter, -apple-system, sans-serif";
+      Chart.defaults.font.size = 11;
+
       new Chart(document.getElementById("chart-mentions"), {
         type: "bar",
         data: {
           labels: data.map(d => d.day),
           datasets: [
-            { label: "згадувань", data: data.map(d => d.mentions), yAxisID: "y" },
-            { label: "охоплення", data: data.map(d => d.reach), type: "line", yAxisID: "y1" },
+            {
+              label: "згадувань",
+              data: data.map(d => d.mentions),
+              backgroundColor: accent,
+              borderRadius: 0,
+              barPercentage: 0.6,
+              categoryPercentage: 0.9,
+              yAxisID: "y",
+            },
+            {
+              label: "охоплення",
+              data: data.map(d => d.reach),
+              type: "line",
+              borderColor: ink,
+              backgroundColor: "transparent",
+              borderWidth: 1.2,
+              pointRadius: 0,
+              pointHoverRadius: 4,
+              pointHoverBackgroundColor: ink,
+              tension: 0.25,
+              yAxisID: "y1",
+            },
           ],
         },
         options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: "bottom",
+              labels: { color: inkDim, usePointStyle: true, boxWidth: 8, padding: 18 },
+            },
+            tooltip: {
+              backgroundColor: "#111113",
+              borderColor: line,
+              borderWidth: 1,
+              titleColor: ink,
+              bodyColor: ink,
+              padding: 12,
+              displayColors: false,
+            },
+          },
           scales: {
-            y: { position: "left", beginAtZero: true },
-            y1: { position: "right", beginAtZero: true, grid: { drawOnChartArea: false } },
+            x: { grid: { color: "transparent" }, ticks: { color: inkDim } },
+            y:  { position: "left",  beginAtZero: true, grid: { color: line }, ticks: { color: inkDim } },
+            y1: { position: "right", beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { color: inkDim } },
           },
         },
       });
@@ -58,24 +136,32 @@
   </script>
 </section>
 
-<section class="card two-col">
+<section class="section reveal two-col">
   <div>
-    <h3>Топ постів за переглядами</h3>
+    <div class="section-head" style="margin-bottom:1.5rem;">
+      <h3>Топ <em>постів</em></h3>
+      <span class="num">[03 / top]</span>
+    </div>
     <ol class="top-list">
       {% for p in top %}
       <li>
-        <a href="{{ p.url }}" target="_blank">{{ p.group_name or p.group_screen }}</a>
-        <span class="muted">· {{ p.date.strftime("%Y-%m-%d") }} · {{ p.views }} переглядів · {{ p.likes }} ❤</span>
+        <a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.group_name or p.group_screen }}</a>
+        <div class="faint" style="margin-top:0.25rem;">
+          {{ p.date.strftime("%Y-%m-%d") }} · 👁 {{ p.views }} · ❤ {{ p.likes }}
+        </div>
         <div class="snippet">{{ p.text[:240] }}{% if p.text|length > 240 %}…{% endif %}</div>
       </li>
       {% endfor %}
     </ol>
   </div>
   <div>
-    <h3>Хмара супутніх слів</h3>
+    <div class="section-head" style="margin-bottom:1.5rem;">
+      <h3>Хмара <em>слів</em></h3>
+      <span class="num">[04 / cooccurrence]</span>
+    </div>
     <div class="cloud">
       {% for w in cloud %}
-        <span class="cloud-word" style="font-size: {{ 0.8 + (w.count / (cloud[0].count or 1)) * 1.6 }}rem">
+        <span class="cloud-word" style="font-size: {{ 1.0 + (w.count / (cloud[0].count or 1)) * 2.2 }}rem">
           {{ w.word }}<sub>{{ w.count }}</sub>
         </span>
       {% endfor %}
@@ -83,22 +169,34 @@
   </div>
 </section>
 
-<section class="card">
-  <h3>Результати ({{ results.total }})</h3>
+<section class="section reveal">
+  <div class="section-head">
+    <h3>Результати <em>({{ results.total }})</em></h3>
+    <span class="num">[05 / index]</span>
+  </div>
   <ul class="results">
     {% for r in results.items %}
     <li>
-      <div>
-        <a href="{{ r.url }}" target="_blank">{{ r.group_name or r.group_screen }}</a>
-        <span class="muted">· {{ r.date.strftime("%Y-%m-%d %H:%M") }}
-          · 👁 {{ r.views }} · ❤ {{ r.likes }} · ↻ {{ r.reposts }} · 💬 {{ r.comments }}</span>
+      <a href="{{ r.url }}" target="_blank" rel="noopener">{{ r.group_name or r.group_screen }}</a>
+      <div class="faint" style="margin-top:0.25rem;">
+        {{ r.date.strftime("%Y-%m-%d %H:%M") }} · 👁 {{ r.views }} · ❤ {{ r.likes }} · ↻ {{ r.reposts }} · 💬 {{ r.comments }}
       </div>
       <div class="snippet">{{ r.headline|safe }}</div>
     </li>
     {% else %}
-    <li class="muted">Нічого не знайдено.</li>
+    <li class="muted" style="text-align:center;padding:2rem 0;">
+      <em style="font-size:1.3rem;">Нічого не знайдено.</em>
+    </li>
     {% endfor %}
   </ul>
 </section>
+{% else %}
+<section class="section reveal">
+  <p class="muted" style="max-width:55ch;font-size:1.05rem;">
+    Введи запит вище, щоб побачити динаміку згадувань, хмару супутніх слів, топ постів і повний індекс.
+    Підтримуються <em>«точні фрази»</em>, <em>~підрядки~</em> та поєднання слів через пробіл.
+  </p>
+</section>
 {% endif %}
+
 {% endblock %}
